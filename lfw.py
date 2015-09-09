@@ -1,4 +1,3 @@
-__author__ = 'dracz'
 
 import glob
 import os
@@ -11,6 +10,9 @@ import cv2
 
 import detectors
 from images import load_matrix_2d
+from images import sample_patches, tile_images
+
+__author__ = 'dracz'
 
 LFW_ROOT = "../../data/lfw"
 LFWC_ROOT = "../../data/lfwcrop_grey"
@@ -105,8 +107,6 @@ def show_image(title, img, detector=None, size=None):
         display_img = cv2.resize(display_img, size)
     cv2.imshow(title, display_img)
 
-
-from images import sample_patches, tile_images
 
 if __name__ == "__main__":
     args = sys.argv[1:]

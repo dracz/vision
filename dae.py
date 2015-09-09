@@ -1,6 +1,6 @@
-__author__ = 'dracz'
 
-import math, timeit
+import math
+import timeit
 
 import numpy
 import theano
@@ -10,6 +10,9 @@ from theano.tensor.shared_randomstreams import RandomStreams
 
 from PIL import Image
 from utils import tile_raster_images
+
+
+__author__ = 'dracz'
 
 
 class DenoisingAutoencoder(object):
