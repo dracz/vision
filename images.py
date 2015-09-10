@@ -46,7 +46,6 @@ def sample_patches(paths, patch_size, n_patches):
         # choose random patch
         x = random.randrange(img.shape[0]-patch_width+1)
         y = random.randrange(img.shape[1]-patch_height+1)
-        print("choosing patch at ({}, {}".format(x,y))
         patch = img[x:x+patch_width, y:y+patch_height]
 
         yield patch
