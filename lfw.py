@@ -18,11 +18,11 @@ LFW_ROOT = "../../data/lfw"
 LFWC_ROOT = "../../data/lfwcrop_grey"
 
 
-def load_lfw(path=LFW_ROOT, shuffle=True, limit=-1):
+def load_lfw(path=LFW_ROOT, shuffle=True, limit=-1, scale=False):
     return load_matrix_2d(lfw_paths(path, shuffle=shuffle, limit=limit))
 
 
-def load_lfwc(path=LFWC_ROOT, shuffle=True, limit=-1):
+def load_lfwc(path=LFWC_ROOT, shuffle=True, limit=-1, scale=False):
     return load_matrix_2d(lfwc_paths(path, shuffle=shuffle, limit=limit))
 
 
@@ -119,5 +119,5 @@ if __name__ == "__main__":
         n_samples = 2500
         tile_shape = (20, 20)
         patches = list(sample_patches(lfwc_paths(), tile_shape, n_samples))
-        tiled = tile_images(patches, tile_shape)
-        tiled.show()
+        tiled = tile_images(patches, tile_shape, show=True)
+

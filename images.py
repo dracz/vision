@@ -12,27 +12,61 @@ __author__ = 'dracz'
 
 
 def load_images(paths):
-    """load images from paths into list of 2d ndarray"""
+    """ Load images from paths into list of 2d ndarray """
     return [cv2.imread(path, 0) for path in paths]
 
 
-def load_matrix_2d(paths):
-    """ load images from paths into columns in n x m ndarray """
-    return np.asarray([img.flatten() for img in load_images(paths)]).T
+def load_matrix_2d(paths, scale=False):
+    """ Load images from paths into columns in n x m ndarray """
+    a = np.asarray([img.flatten() for img in load_images(paths)]).T
+    if not scale:
+        return a
+    return scale_input(a)
 
 
 def load_matrix_3d(paths):
-    """
-    Load images from paths into m x w x h 3d ndarray
-    """
+    """ Load images from paths into m x w x h 3d ndarray """
     return np.asarray(load_images(paths))
+
+
+def scale_input(data):
+    """
+    Normalize data matrix to have zero mean and optionally unit variance and
+    truncate to +/- 3 standard deviations, scale to range [0., 1.]
+    :param data: (n x m) 2d ndarray where columns are input vectors
+    :return: normalized 2d ndarray
+    """
+    x = data - data.mean(axis=0)
+    std = 3 * x.std()
+    x[x < -std] = -std
+    x[x > std] = std
+    x /= std
+    return (x + 1) * 0.5
+
+
+def load_patch_matrix(paths, patch_size, n_patches, scale=False):
+    """
+    Load matrix of image patches from paths
+    :param paths: Paths of input image files
+    :param patch_size: The size of patches to sample from images
+    :param n_patches: The total number of patches to load
+    :param scale: Whether to scale the input to [0, 1]
+    :return: 2d ndarray with images represented as column vectors
+    """
+    patches = sample_patches(paths, patch_size, n_patches)
+    a = np.asarray([img.flatten() for img in patches]).T
+    if not scale:
+        return a
+    return scale_input(a)
 
 
 def sample_patches(paths, patch_size, n_patches):
     """
     Sample random gray-scale patches from face images found in paths list
+    :param paths: Paths of input image files
     :param patch_size: the (w, h) of the image patch to sample
-    :return: iterator over 2d ndarray of grayscale values
+    :param n_patches: The total number of patches to load
+    :return: Generator producing 2d ndarray of grayscale values
     """
     imgs = load_images(paths)
 
@@ -51,21 +85,22 @@ def sample_patches(paths, patch_size, n_patches):
         yield patch
 
 
-def tile_images(img_tiles, tile_shape, tiling_shape=None):
+def tile_images(img_tiles, patch_shape, output_shape=None, show=False):
     """
     Generate an image composed of the img_tiles
     :param img_tiles: list of 2-d ndarray of grey-scale image tiles
-    :param tile_shape: The shape of the img_tiles (n_pixels_w, n_pixels_h)
-    :param tiling_shape: The shape of the tiling (n_tiles_w, n_tiles_h)
-    :return: an Image
+    :param patch_shape: The shape of the img_tiles (n_pixels_w, n_pixels_h)
+    :param output_shape: The shape of the tiling (n_tiles_w, n_tiles_h)
+    :param show: Whether to display the image
+    :return: An instance of PIL Image
     """
-    if not tiling_shape:
+    if not output_shape:
         w = int(math.floor(math.sqrt(len(img_tiles))))
         h = w
     else:
-        w, h = tiling_shape
+        w, h = output_shape
 
-    tile_w, tile_h = tile_shape  # shape of image tile
+    tile_w, tile_h = patch_shape  # shape of image tile
     shape = (w * tile_w, h * tile_h)
     img = Image.new("L", shape, "white")
 
@@ -76,6 +111,9 @@ def tile_images(img_tiles, tile_shape, tiling_shape=None):
         r, c = i/w, i % w
         box = (c*tile_w, r*tile_h, c*tile_w + tile_w, r*tile_h + tile_h)
         img.paste(tile, box)
-    return img
 
+    if show:
+        img.show()
+
+    return img
 
