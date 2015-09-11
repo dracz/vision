@@ -191,6 +191,8 @@ def test_pca(sh=(12, 12), m=10, retain=0.9):
 
     xt, mean = pca.reduce(x, retain=retain)
     cov = np.dot(xt, xt.T)
+
+    plt.jet()
     plt.imshow(cov)
     plt.show()
 
@@ -209,6 +211,7 @@ def test_pca_white(sh=(12, 12), m=500, eps=0.1, rc=(10, 10), out_dir="img"):
     f, axes = plt.subplots(rows, cols, sharex='col', sharey='row')
 
     plt.subplots_adjust(hspace=0.1, wspace=0)
+    plt.jet()
 
     for r in range(rows):
         for c in range(cols):
@@ -220,6 +223,7 @@ def test_pca_white(sh=(12, 12), m=500, eps=0.1, rc=(10, 10), out_dir="img"):
     plt.savefig(path, bbox_inches='tight')
 
     cv = np.dot(x_white, x_white.T)
+    plt.clf()
     plt.imshow(cv)
     plt.show()
 
@@ -266,17 +270,17 @@ def main():
     n_faces = 20
     face_shape = (64, 64)
 
-    pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=True)
-    pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=False)
+    #pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=True)
+    #pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=False)
 
-    test_pca()
+    #test_pca()
 
     m_patches = 300000
     patch_sizes = [(i, i) for i in np.arange(8, 17)]
 
     for sh in patch_sizes:
         test_pca_white(sh=sh, m=m_patches)
-        test_zca_white(sh=sh, m=m_patches)
+        #test_zca_white(sh=sh, m=m_patches)
 
 
 if __name__ == "__main__":

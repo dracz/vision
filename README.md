@@ -11,15 +11,28 @@ this is ... we'll see
 
 # getting data
 
+Input data is expected to be unpacked in a path relative to the code:
+
+    ../../img
+    
+
 ## labeled faces in the wild (lfw)
 
-Available here: http://vis-www.cs.umass.edu/lfw/lfw.tgz
+Download here:
+http://vis-www.cs.umass.edu/lfw/lfw.tgz
 
     cd data
     curl http://vis-www.cs.umass.edu/lfw/lfw.tgz > lfw.tgz
     tar zxvf lfw.tgz
     rm lwf.tgz
     
+## labeled faces in the wild, cropped (lfwc)
+
+Download here:
+http://conradsanderson.id.au/lfwcrop/lfwcrop_grey.zip
+
+
+
 
 
 
