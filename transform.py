@@ -270,17 +270,17 @@ def main():
     n_faces = 20
     face_shape = (64, 64)
 
-    #pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=True)
-    #pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=False)
+    pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=True)
+    pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=False)
 
-    #test_pca()
+    test_pca()
 
     m_patches = 300000
     patch_sizes = [(i, i) for i in np.arange(8, 17)]
 
     for sh in patch_sizes:
         test_pca_white(sh=sh, m=m_patches)
-        #test_zca_white(sh=sh, m=m_patches)
+        test_zca_white(sh=sh, m=m_patches)
 
 
 if __name__ == "__main__":
