@@ -79,7 +79,7 @@ class DenoisingAutoencoder(object):
         return cost, updates
 
     def train(self, train_set, batch_size=20, corruption_rate=0.3,
-              learning_rate=0.1, n_epochs=15):
+              learning_rate=0.1, n_epochs=15, stop_diff=None):
 
         n_training = train_set.get_value(borrow=True).shape[0]
         n_train_batches = n_training / batch_size
@@ -106,13 +106,25 @@ class DenoisingAutoencoder(object):
 
         t1 = timeit.default_timer()
 
+        last_cost = None
+
         for epoch in range(n_epochs):
             c = []
 
             for batch_index in range(n_train_batches):
                 c.append(train_da(batch_index))
 
-            print('Epoch: {}, Cost: {}'.format(epoch, np.mean(c)))
+            avg_cost = np.mean(c)
+
+            diff = None if last_cost is None else (avg_cost - last_cost) / last_cost
+            ds = "" if diff is None else " ({:.4%})".format(diff)
+            print('Epoch: {}, Cost: {}{}'.format(epoch, avg_cost, ds))
+
+            last_cost = avg_cost
+
+            if stop_diff is not None and diff is not None and np.abs(diff) < np.abs(stop_diff):
+                print("diff abs({}) < abs({}), stopping".format(diff, stop_diff))
+                break
 
         t2 = timeit.default_timer()
 

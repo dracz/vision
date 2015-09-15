@@ -1,7 +1,7 @@
 
 import os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
 
 from images import sample_patches
@@ -10,7 +10,7 @@ from lfw import lfwc_paths
 __author__ = 'dracz'
 
 
-epsilon = 10.0**-5  # default regularization value
+epsilon = 0.1  # default regularization value
 
 
 class PCA:
@@ -24,8 +24,10 @@ class PCA:
         columns represent examples and rows are features of each example
         """
         n, m = data.shape
+        self.mean = data.mean(axis=0)
+        """mean subtracted from training data"""
 
-        self.x = data - data.mean(axis=0)
+        self.x = data - self.mean
         """the zero-mean input data used to fit the model"""
 
         self.sigma = np.dot(self.x, self.x.T) / m
@@ -151,10 +153,17 @@ def pca_faces_image(sh=(64, 64), m=500, n_faces=20, k_vals=None,
 
     pca = PCA(x)
 
-    retain = [0.99, 0.95] + list(np.arange(0.90, 0.1, -0.05))
-    k_vals = k_vals if k_vals is not None else [pca.find_k(p) for p in retain]
+    k_max = pca.find_k(0.99)
+    k_min = pca.find_k(0.1)
+
+    if k_vals is None:
+        k_vals = [int(k) for k in np.linspace(k_min, k_max, n_faces)]
 
     img = Image.new("L", (sh[0]*(len(k_vals) + 1), sh[1]*n_faces))
+
+    print("retaining top {}...".format(k_vals))
+
+    # plot and save sample of faces and various levels of reconstruction
 
     for i in range(test_x.shape[1]):
         img.paste(Image.fromarray(x[:, i].reshape(sh)), (0, i*sh[1]))
@@ -163,9 +172,9 @@ def pca_faces_image(sh=(64, 64), m=500, n_faces=20, k_vals=None,
             x_tilde, mean = pca.reduce(test_x[:, i], k=k)
             x_hat = pca.reconstruct(x_tilde, mean=mean).reshape(sh)
             img.paste(Image.fromarray(x_hat), ((j+1)*sh[0], i*sh[1]))
+
     img.show()
 
-    # plot and save sample of faces and various levels of reconstruction
     fn = "pca_faces{}.png".format("_in_sample" if test_in_sample else "_out_sample")
     img.save(os.path.join(out_dir, fn))
 
@@ -228,7 +237,7 @@ def test_pca_white(sh=(12, 12), m=500, eps=0.1, rc=(10, 10), out_dir="img"):
     plt.show()
 
 
-def test_zca_white(sh=(12, 12), m=500, n_faces=20, out_dir="img"):
+def test_zca_white(sh=(12, 12), m=500, n_faces=20, out_dir="img", eps=None, show=False):
     """
     Test the ZCA whitening by visualizing at different levels of epsilon
     :param sh: The shape of the tiles
@@ -236,7 +245,9 @@ def test_zca_white(sh=(12, 12), m=500, n_faces=20, out_dir="img"):
     :param n_faces: The number of faces to visualize
     :param out_dir: The directory to write output image
     """
-    eps = list([10**-i for i in np.linspace(-3, 20, n_faces)]) + [0]
+
+    if eps is None:
+        eps = [10**-i for i in np.linspace(-3, 10, 20)]
 
     x = test_pca_input(sh, m)
     pca = PCA(x)
@@ -259,28 +270,39 @@ def test_zca_white(sh=(12, 12), m=500, n_faces=20, out_dir="img"):
             axes[r][c+1].axis('off')
             i += 1
 
-    fn = "zca_faces_{}_{}_{}-{}.png".format(m, sh, eps[-1], eps[0])
-    path = os.path.join(out_dir, fn)
-    print("saving {}...".format(path))
-    plt.savefig(path, bbox_inches='tight')
+    if out_dir is not None:
+        fn = "zca_faces_{}_{}_{}-{}.png".format(m, sh, eps[-1], eps[0])
+        path = os.path.join(out_dir, fn)
+        print("saving {}...".format(path))
+        plt.savefig(path, bbox_inches='tight')
+
+    if show:
+        plt.show()
 
 
-def main():
-    m_faces = 60000
+def pca_faces():
+    m_faces = 5000
     n_faces = 20
-    face_shape = (64, 64)
+    face_shape = (12, 12)
 
     pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=True)
     pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=False)
 
-    test_pca()
 
+def test_whitening():
     m_patches = 300000
     patch_sizes = [(i, i) for i in np.arange(8, 17)]
 
     for sh in patch_sizes:
         test_pca_white(sh=sh, m=m_patches)
         test_zca_white(sh=sh, m=m_patches)
+
+
+def main():
+    pca_faces()
+    test_pca()
+    test_whitening()
+    test_zca_white()
 
 
 if __name__ == "__main__":

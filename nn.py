@@ -39,6 +39,7 @@ def render_filters(w, sh, image_file=None, axis=0, sp=1, show=False):
         img.paste(x_img.copy(), (sp + c*(sh[0] + sp), sp + r*(sh[1] + sp)))
 
     if image_file is not None:
+        print("saving {}...".format(image_file))
         img.save(image_file)
 
     if show:

@@ -84,6 +84,9 @@ def sample_patches(paths, patch_size, n_patches):
 
         yield patch
 
+def tile_images_mat(img_mat, patch_shape, output_shape=None, show=False):
+    img_tiles = [img_mat[i, :] for i in range(img_mat.shape[1])]
+    print(len(img_tiles))
 
 def tile_images(img_tiles, patch_shape, output_shape=None, show=False):
     """
