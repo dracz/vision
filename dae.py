@@ -40,7 +40,7 @@ class DenoisingAutoencoder(object):
         self.w = w  # weights
         self.b = bh  # bias of hidden units
         self.b_prime = bv  # bias of visible units
-        self.w_prime = self.w.T  # tied weights, W_prime = W transpose
+        self.w_prime = self.w.T  # tied weights
         self.theano_rng = theano_rng
 
         self.x = x
@@ -80,6 +80,7 @@ class DenoisingAutoencoder(object):
 
     def train(self, train_set, batch_size=20, corruption_rate=0.3,
               learning_rate=0.1, n_epochs=15, stop_diff=None):
+        """train the autoencoder. train_set is a theano shared ndarray with examples in rows"""
 
         n_training = train_set.get_value(borrow=True).shape[0]
         n_train_batches = n_training / batch_size

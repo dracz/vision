@@ -3,6 +3,7 @@ import math
 import random
 import cv2
 import numpy as np
+import itertools
 
 from PIL import Image
 
@@ -44,22 +45,6 @@ def scale_input(data):
     return (x + 1) * 0.5
 
 
-def load_patch_matrix(paths, patch_size, n_patches, scale=False):
-    """
-    Load matrix of image patches from paths
-    :param paths: Paths of input image files
-    :param patch_size: The size of patches to sample from images
-    :param n_patches: The total number of patches to load
-    :param scale: Whether to scale the input to [0, 1]
-    :return: 2d ndarray with images represented as column vectors
-    """
-    patches = sample_patches(paths, patch_size, n_patches)
-    a = np.asarray([img.flatten() for img in patches]).T
-    if not scale:
-        return a
-    return scale_input(a)
-
-
 def sample_patches(paths, patch_size, n_patches):
     """
     Sample random gray-scale patches from face images found in paths list
@@ -84,9 +69,28 @@ def sample_patches(paths, patch_size, n_patches):
 
         yield patch
 
-def tile_images_mat(img_mat, patch_shape, output_shape=None, show=False):
-    img_tiles = [img_mat[i, :] for i in range(img_mat.shape[1])]
-    print(len(img_tiles))
+
+def all_patches(paths, patch_shape, shuffle=True):
+    """
+    Load all patches of the specified shape from the images found in paths
+    :return: A generator of 2d ndarray of patch_shape
+    """
+    mat = load_matrix_3d(paths)
+    img_rows, img_cols = mat.shape[1:]
+    patch_rows, patch_cols = patch_shape
+    row_ranges = [(r, r+patch_rows) for r in range(img_rows-patch_rows)]
+    col_ranges = [(c, c+patch_cols) for c in range(img_cols-patch_cols)]
+    img_inds = range(mat.shape[0])
+
+    inds = list(itertools.product(img_inds, row_ranges, col_ranges))
+    if shuffle:
+        random.shuffle(inds)
+
+    for i, r_rng, c_rng in inds:
+        r_start, r_end = r_rng
+        c_start, c_end = c_rng
+        yield mat[i, r_start:r_end, c_start:c_end]
+
 
 def tile_images(img_tiles, patch_shape, output_shape=None, show=False):
     """
@@ -107,8 +111,8 @@ def tile_images(img_tiles, patch_shape, output_shape=None, show=False):
     shape = (w * tile_w, h * tile_h)
     img = Image.new("L", shape, "white")
 
-    for i, mat in enumerate(img_tiles):
-        tile = Image.fromarray(mat)
+    for i in range(w*h):
+        tile = Image.fromarray(img_tiles[i])
         if i == w*h:
             break
         r, c = i/w, i % w

@@ -110,7 +110,7 @@ class PCA:
         mean = x.mean(axis=0)
         return np.dot(np.dot(d, self.u.T), x - mean), mean
 
-    def whiten_zca(self, x=None, eps=epsilon):
+    def whiten_zca(self, x=None, eps=epsilon, retain=1):
         """
         ZCA whiten the column vector or matrix x
 
@@ -122,7 +122,15 @@ class PCA:
         :return: ZCA whitened version of the data and mean value(s) subtracted from input
         """
         if x is None: x = self.x
-        tmp = np.dot(self.u, np.diag(1. / np.sqrt(self.s + eps)))
+
+        diag = self.s
+
+        if retain < 1:
+            k = self.find_k(retain=retain)
+            print("Retaining top {} components".format(k))
+            diag[k:] = 0
+
+        tmp = np.dot(self.u, np.diag(1. / np.sqrt(diag + eps)))
         tmp = np.dot(tmp, self.u.T)
         mean = x.mean(axis=0)
         return np.dot(tmp, x-mean), mean

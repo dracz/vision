@@ -5,17 +5,19 @@ import re
 import string
 import sys
 import random
+import timeit
 
 import cv2
+import numpy as np
 
 import detectors
-from images import load_matrix_2d
+from images import load_matrix_2d, all_patches
 from images import sample_patches, tile_images
 
 __author__ = 'dracz'
 
 LFW_ROOT = "../../data/lfw"
-LFWC_ROOT = "../../data/lfwcrop_grey"
+LFWC_ROOT = "../../data/lfwcrop_grey"  # contains 13,232 images
 
 
 def load_lfw(path=LFW_ROOT, shuffle=True, limit=-1, scale=False):
@@ -24,6 +26,31 @@ def load_lfw(path=LFW_ROOT, shuffle=True, limit=-1, scale=False):
 
 def load_lfwc(path=LFWC_ROOT, shuffle=True, limit=-1, scale=False):
     return load_matrix_2d(lfwc_paths(path, shuffle=shuffle, limit=limit))
+
+
+def load_lfwc_patches(patch_shape, shuffle=True, cache=True, cache_dir="./cache"):
+    t1 = timeit.default_timer()
+
+    cache_file = os.path.join(cache_dir, "lfwc_patches_{}.npy".format(patch_shape))
+
+    if cache and os.path.exists(cache_file):
+        print("Loading cached patches from {}...".format(cache_file))
+        patches = np.load(cache_file)
+        t2 = timeit.default_timer()
+        print("Loaded {:,} patches from {} in {:.2f}".format(len(patches), cache_file, t2-t1))
+        return patches
+
+    print("Loading all lfwc patches of shape {}...".format(patch_shape))
+    patches = np.asarray(list(all_patches(lfwc_paths(), patch_shape, shuffle=shuffle)))
+
+    t2 = timeit.default_timer()
+    print("Loaded {:,} patches in {:.2f}".format(len(patches), t2-t1))
+
+    if cache:
+        print("Saving patches to {}...".format(cache_file))
+        np.save(cache_file, patches)
+
+    return patches
 
 
 def lfw_paths(path=LFW_ROOT, shuffle=True, limit=-1):
@@ -110,7 +137,7 @@ def show_image(title, img, detector=None, size=None):
 
 if __name__ == "__main__":
     args = sys.argv[1:]
-    cmd = args[0] if len(args) > 0 else "sample"
+    cmd = args[0] if len(args) > 0 else "patches"
 
     if cmd == "show":
         show_images(lfwc_paths())
@@ -121,3 +148,11 @@ if __name__ == "__main__":
         patches = list(sample_patches(lfwc_paths(), tile_shape, n_samples))
         tiled = tile_images(patches, tile_shape, show=True)
 
+    elif cmd == "patches":
+        shapes = [(i, i) for i in range(8, 12)]
+        for sh in shapes:
+            patches = load_lfwc_patches(sh, cache_dir="./cache")
+            img = tile_images(patches, sh, output_shape=(100, 100), show=True)
+            fn = "./img/lfwc_patches_{}.png".format(sh)
+            print("saving {}...".format(fn))
+            img.save(fn)
