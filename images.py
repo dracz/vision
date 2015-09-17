@@ -1,15 +1,17 @@
 
+import itertools
 import math
-import random
+
 import cv2
 import numpy as np
-import itertools
-
+from matplotlib import pyplot as plt
 from PIL import Image
 
 __author__ = 'dracz'
 
-""" Various image manipulation utilities """
+"""
+Various image manipulation utilities
+"""
 
 
 def load_images(paths):
@@ -20,9 +22,7 @@ def load_images(paths):
 def load_matrix_2d(paths, scale=False):
     """ Load images from paths into columns in n x m ndarray """
     a = np.asarray([img.flatten() for img in load_images(paths)]).T
-    if not scale:
-        return a
-    return scale_input(a)
+    return a
 
 
 def load_matrix_3d(paths):
@@ -30,74 +30,53 @@ def load_matrix_3d(paths):
     return np.asarray(load_images(paths))
 
 
-def sample_patches(paths, patch_size, n_patches):
+def sample_patches(imgs, patch_shape=(12, 12), n_samples=10000):
     """
-    Sample random gray-scale patches from face images found in paths list
-    :param paths: Paths of input image files
-    :param patch_size: the (w, h) of the image patch to sample
-    :param n_patches: The total number of patches to load
-    :return: Generator producing 2d ndarray of grayscale values
+    Sample n_samples of patch_shape from imgs (with replacement)
+    :param imgs: ndarray of shape [n_imgs, n_img_rows, n_img_cols]
+    :param patch_shape: The shape of the patches to sample
+    :return: ndarray of shape [n_samples, patch_shape[0], patch_shape[1]]
     """
-    imgs = load_images(paths)
+    n_images, n_img_rows, n_img_cols = imgs.shape
+    n_patch_rows, n_patch_cols = patch_shape
 
-    for i in range(n_patches):
-        # choose random img
-        ri = random.randrange(len(imgs))
-        img = imgs[ri]
+    assert (n_patch_rows <= n_img_rows)
+    assert (n_patch_cols <= n_img_cols)
 
-        patch_width, patch_height = patch_size
+    patches = np.zeros((n_samples, n_patch_rows, n_patch_cols))
 
-        # choose random patch
-        x = random.randrange(img.shape[0]-patch_width+1)
-        y = random.randrange(img.shape[1]-patch_height+1)
-        patch = img[x:x+patch_width, y:y+patch_height]
+    for n in range(n_samples):
+        i = np.random.randint(0, n_images)
+        r = np.random.randint(0, n_img_rows - n_patch_rows)
+        c = np.random.randint(0, n_img_cols - n_patch_cols)
+        patches[n,:,:] = imgs[i, r:r + n_patch_rows, c:c + n_patch_cols]
 
-        yield patch
-
-
-def all_patches(paths, patch_shape, shuffle=True):
-    """
-    Load all patches of the specified shape from the images found in paths
-    :return: A generator of 2d ndarray of patch_shape
-    """
-    mat = load_matrix_3d(paths)
-    img_rows, img_cols = mat.shape[1:]
-    patch_rows, patch_cols = patch_shape
-    row_ranges = [(r, r+patch_rows) for r in range(img_rows-patch_rows)]
-    col_ranges = [(c, c+patch_cols) for c in range(img_cols-patch_cols)]
-    img_inds = range(mat.shape[0])
-
-    inds = list(itertools.product(img_inds, row_ranges, col_ranges))
-    if shuffle:
-        random.shuffle(inds)
-
-    for i, r_rng, c_rng in inds:
-        r_start, r_end = r_rng
-        c_start, c_end = c_rng
-        yield mat[i, r_start:r_end, c_start:c_end]
+    return patches
 
 
-def tile_images(img_tiles, patch_shape, output_shape=None, show=False):
+def tile_images(imgs, patch_shape=None, output_shape=None, show=False):
     """
     Generate an image composed of the img_tiles
-    :param img_tiles: list of 2-d ndarray of grey-scale image tiles
-    :param patch_shape: The shape of the img_tiles (n_pixels_w, n_pixels_h)
+    :param imgs: m x r x c ndarray of image patches
     :param output_shape: The shape of the tiling (n_tiles_w, n_tiles_h)
     :param show: Whether to display the image
     :return: An instance of PIL Image
     """
+
+    m, n_patch_rows, n_patch_cols = imgs.shape
+
     if not output_shape:
-        w = int(math.floor(math.sqrt(len(img_tiles))))
+        w = int(math.floor(math.sqrt(m)))
         h = w
     else:
         w, h = output_shape
 
     tile_w, tile_h = patch_shape  # shape of image tile
-    shape = (w * tile_w, h * tile_h)
-    img = Image.new("L", shape, "white")
+    img = Image.new("L", (w * tile_w, h * tile_h), "white")
 
     for i in range(w*h):
-        tile = Image.fromarray(img_tiles[i])
+        if i >= m: break
+        tile = Image.fromarray(imgs[i,:,:])
         if i == w*h:
             break
         r, c = i/w, i % w
@@ -109,3 +88,31 @@ def tile_images(img_tiles, patch_shape, output_shape=None, show=False):
 
     return img
 
+
+def plot_images(imgs, rows=10, cols=10, block=True, shape=None, fname=None, show=True):
+    """
+    Plot a sample of the images
+    :param imgs: 3d ndarray m x r x c of images
+    :param rows: The number of rows to display
+    :param cols: The number of columns to display
+    :param shape: If shape, then expect imgs is 2d array and reshape
+    """
+    if fname is None and show is False:
+        return
+
+    f, axes = plt.subplots(rows, cols, sharex='col', sharey='row')
+    plt.subplots_adjust(hspace=0.01, wspace=0)
+
+    for i, (r, c) in enumerate(itertools.product(range(rows), range(cols))):
+        plt.gray()
+        if shape is not None:
+            img = imgs[i,:].reshape(shape)
+        else:
+            img = imgs[i,:,:]
+        axes[r][c].imshow(img)
+        axes[r][c].axis('off')
+    plt.draw()
+    if fname:
+        plt.savefig(fname)
+    if show:
+        plt.show(block=block)

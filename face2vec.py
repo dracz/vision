@@ -1,136 +1,119 @@
-import itertools
 
-from lfw import lfwc_paths, sample_patches, load_lfwc_patches
-from dae import DenoisingAutoencoder
-from nn import render_filters
-from transform import PCA, scale_input
+import glob, os, random
+
+import cv2, theano
 import numpy as np
-from matplotlib import pyplot as plt
-import theano
+from nn import render_filters
+from images import plot_images, sample_patches
+from lfw import LFWC_PATTERN
 
-__author__ = 'dracz'
-
-
-def get_input(paths=lfwc_paths(), n_samples=100000, patch_shape=(14, 14), whiten=(0.1, 1),
-              show=False):
-    """get 2d ndarray of input vectors in rows"""
-
-    print("Sampling {} input patches of shape {}...".format(n_samples, patch_shape))
-    x = [p.flatten() for p in sample_patches(paths, patch_shape, n_samples)]
-    a = np.asarray(x, dtype=theano.config.floatX)
-    pca = None
-
-    if show:
-        display_patches(a, patch_shape, rows=10, cols=10)
-
-    if whiten is not None:
-        eps, retain = whiten
-
-        print("Whitening with epsilon = {}, retaining = {} ".format(eps, retain))
-        pca = PCA(a.T)
-
-        x_rot, mean = pca.whiten_zca(eps=eps, retain=retain)
-        a = x_rot.T
-
-        if show:
-            display_patches(a, patch_shape, rows=10, cols=10)
-
-    return scale_input(a)
+from dae import DenoisingAutoencoder
 
 
-def display_patches(patches, sh, rows=10, cols=10):
+def get_input(input_pattern=LFWC_PATTERN,
+              n_samples=5000, patch_shape=(12, 12),
+              n_images=100, epsilon=0.1, norm_axis=0):
     """
-    Plot sample of images patches
-    :param patches: The patches to display as matrix of columns vectors
-    :param sh: The shape of the tiles
-    :param rows: The number of rows to display
-    :param cols: The number of columns to display
-    """
-    f, axes = plt.subplots(rows, cols, sharex='col', sharey='row')
-    plt.subplots_adjust(hspace=0.01, wspace=0)
-
-    for i, (r, c) in enumerate(itertools.product(range(rows), range(cols))):
-        plt.gray()
-        axes[r][c].imshow(patches[i, :].reshape(sh))
-        axes[r][c].axis('off')
-    plt.draw()
-    plt.show(block=False)
-
-
-def train_dae(patches, patch_shape=(14, 14), n_hidden=64, corruption_rate=0.3,
-              learning_rate=0.1, n_epochs=15, batch_size=200, whiten=(0.1, 1),
-              show=False, save=None, stop_diff=0.001):
-    """
-    Train denoising auto-encoder on face samples
-    :param patch_shape: The shape of each input image patch
-    :param n_hidden: The number of hidden units
-    :param corruption_rate: The amount of noise to introduce [0,1]
-    :param learning_rate: The learning rate for gradient descent
-    :param n_epochs: The number of training epochs
-    :param batch_size: The mini-batch size
-    :return: A trained DenoisingAutoencoder
+    Get input data from lfwc patches
+    :param input_pattern: The pattern to glob for image files
+    :param n_images: The number of images to draw samples from
+    :param n_samples: The number of samples to extract
+    :param patch_shape: The shape of the patches to sample
+    :param epsilon: Regularization for whitening, or None to disable whitening
+    :param norm_axis: Whether to mean normalize across each feature (0) or each patch (1)
+    :return: m x n ndarray of flattened images
     """
 
-    assert(patches.shape[1] == patch_shape[0]*patch_shape[1])
+    paths = glob.glob(input_pattern)
+    random.shuffle(paths)
+    paths = paths[:n_images]
 
-    n_visible = patch_shape[0] * patch_shape[1]
+    print("Sampling {} patches from {} images...".format(n_samples, len(paths)))
 
-    da = DenoisingAutoencoder(n_visible, n_hidden)
+    # read images into a m x img_row x img_col ndarray
+    imgs = np.asarray([cv2.imread(path, 0) for path in paths], dtype=theano.config.floatX)
+    imgs /= 255.  # scale to [0,1] # why is this so crucial?
 
-    da.train(theano.shared(patches),
-             corruption_rate=corruption_rate,
-             learning_rate=learning_rate,
-             n_epochs=n_epochs,
-             batch_size=batch_size,
-             stop_diff=stop_diff)
+    # sample patches into a 3d array
+    patches = sample_patches(imgs, patch_shape=patch_shape, n_samples=n_samples)
 
-    if show or save:
-        show_save(da.w.get_value(borrow=True), save=save, show=show, whiten=whiten,
-                  n_hidden=n_hidden, patch_shape=patch_shape, corruption_rate=corruption_rate)
+    # flatten each image to 1d
+    patches = patches.reshape(patches.shape[0], patch_shape[0]*patch_shape[1])
 
-    return da
-
-
-def show_save(w, show=False, save=False, whiten=None, n_hidden=None, patch_shape=None, corruption_rate=None):
-    """show/save the learned weights"""
-    if save:
-        image_file = "img/face_patch_filters_{}_{}_{}_{}.png".format(patch_shape, n_hidden, corruption_rate, whiten)
+    if norm_axis == 0:
+        # subtract per feature (pixel) means across the data set (m x n)
+        normed = patches - patches.mean(axis=0)
     else:
-        image_file = None
-    render_filters(w, patch_shape, image_file=image_file, show=show)
+        # remove mean val of each patch
+        normed = patches - patches.mean(axis=1)[:, np.newaxis]
+
+    if epsilon is None:
+        return normed
+
+    return whiten(normed, epsilon=epsilon)
 
 
-def sweep_params(n_samples=50000, rates=None, tile_range=None,
-                 n_hidden_range=None, save=True, show=False, whitens=None):
-    """
-    Sweep parameters for tile_shape, n_hidden, corruption_rates, ...
-    and save the learned filters
-    """
+def whiten(data, epsilon=0.1):
+    """whiten the m x n array of images"""
+    U, S, V = np.linalg.svd(np.cov(data.T), full_matrices=False)
+    tmp = np.dot(U, np.diag(1. / np.sqrt(S + epsilon)))
+    tmp = np.dot(tmp, U.T)
+    z = np.dot(tmp, data.T)
+    return z.T
 
-    if rates is None:
-        rates = [0.3]
 
-    if tile_range is None:
-        tile_range = range(8, 11)
+def train_dae(patch_shape=(20,20),
+              n_hidden=400,
+              n_samples=50000,
+              batch_size=500,
+              epsilon=0.1,
+              show_input=False,
+              show_filters=True,
+              img_dir=None,
+              norm_axis=0):
 
-    for w in tile_range:
-        patch_shape = (w, w)
+    """ train a denoising autoencoder """
 
-        if whitens is None:
-            whitens = [None]
+    data = get_input(n_samples=n_samples, patch_shape=patch_shape, epsilon=epsilon, norm_axis=norm_axis)
+    if show_input:
+        plot_images(data, shape=patch_shape)
 
-        for whiten in whitens:
-            patches, pca = get_input(n_samples=n_samples, patch_shape=patch_shape, whiten=whiten, show=False)
+    da = DenoisingAutoencoder(n_visible=patch_shape[0]*patch_shape[1],
+                              n_hidden=n_hidden)
 
-            for rate in rates:
-                if n_hidden_range is None:
-                    n_hidden_range = [int(i)**2 for i in np.linspace(4, w, 4)]
+    da.train(theano.shared(data), batch_size=batch_size)
 
-                for h in n_hidden_range:
-                    train_dae(patches=patches, n_hidden=h, patch_shape=patch_shape, whiten=whiten,
-                              corruption_rate=rate, save=save, show=show)
+    if img_dir is not None:
+        fn = os.path.join(img_dir, "face_filters_{}_{}_{}_{}_{}_{}.png"
+                          .format(patch_shape, n_hidden, n_samples, batch_size, epsilon, norm_axis))
+    else:
+        fn = None
+
+    render_filters(da.w.get_value(borrow=True), patch_shape, show=show_filters, image_file=fn)
+
+
+def sweep(patch_shapes=[(24, 24)],
+          n_samples=20000,
+          batch_size=20,
+          epsilons=[0.1, 0.01],
+          n_hiddens=[100, 400],
+          norm_axes=[0],
+          img_dir="./img/face_filters"):
+
+    """train autoencoders using range of params, render and save filters"""
+
+    for patch_shape in patch_shapes:
+        for eps in epsilons:
+            for axis in norm_axes:
+                for n_hidden in n_hiddens:
+                    train_dae(patch_shape=patch_shape,
+                              batch_size=batch_size,
+                              n_samples=n_samples,
+                              n_hidden=n_hidden,
+                              epsilon=eps,
+                              img_dir=img_dir,
+                              norm_axis=axis)
+
 
 if __name__ == "__main__":
-    sh = (14, 14)
-    #train_dae(patches.reshape(patches.shape[0], sh[0]*sh[1]), sh, n_hidden=100, batch_size=1000, show=True)
-
+    sweep()
