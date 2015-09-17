@@ -21,6 +21,9 @@ def render_filters(w, sh, image_file=None, axis=0, sp=1, show=False):
     :return: PIL Image instance
     """
 
+    if image_file is None and not show:
+        return
+
     weights = w if axis == 0 else w.T
     n_visible, n_hidden = weights.shape
 
@@ -38,12 +41,12 @@ def render_filters(w, sh, image_file=None, axis=0, sp=1, show=False):
         x_img = Image.fromarray(v.reshape(sh))
         img.paste(x_img.copy(), (sp + c*(sh[0] + sp), sp + r*(sh[1] + sp)))
 
+    if show:
+        img.show()
+
     if image_file is not None:
         print("saving {}...".format(image_file))
         img.save(image_file)
-
-    if show:
-        img.show()
 
     return img
 

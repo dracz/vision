@@ -13,6 +13,21 @@ __author__ = 'dracz'
 epsilon = 0.1  # default regularization value
 
 
+def scale_input(data):
+    """
+    Normalize data matrix to have zero mean and optionally unit variance and
+    truncate to +/- 3 standard deviations, scale to range [0., 1.]
+    :param data: (n x m) 2d ndarray where columns are input vectors
+    :return: normalized 2d ndarray
+    """
+    x = data - data.mean(axis=0)
+    std = 3 * x.std()
+    x[x < -std] = -std
+    x[x > std] = std
+    x /= std
+    return (x + 1) * 0.5
+
+
 class PCA:
     """An implementation of principal components analysis"""
 

@@ -30,21 +30,6 @@ def load_matrix_3d(paths):
     return np.asarray(load_images(paths))
 
 
-def scale_input(data):
-    """
-    Normalize data matrix to have zero mean and optionally unit variance and
-    truncate to +/- 3 standard deviations, scale to range [0., 1.]
-    :param data: (n x m) 2d ndarray where columns are input vectors
-    :return: normalized 2d ndarray
-    """
-    x = data - data.mean(axis=0)
-    std = 3 * x.std()
-    x[x < -std] = -std
-    x[x > std] = std
-    x /= std
-    return (x + 1) * 0.5
-
-
 def sample_patches(paths, patch_size, n_patches):
     """
     Sample random gray-scale patches from face images found in paths list

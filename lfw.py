@@ -20,11 +20,11 @@ LFW_ROOT = "../../data/lfw"
 LFWC_ROOT = "../../data/lfwcrop_grey"  # contains 13,232 images
 
 
-def load_lfw(path=LFW_ROOT, shuffle=True, limit=-1, scale=False):
+def load_lfw(path=LFW_ROOT, shuffle=True, limit=-1):
     return load_matrix_2d(lfw_paths(path, shuffle=shuffle, limit=limit))
 
 
-def load_lfwc(path=LFWC_ROOT, shuffle=True, limit=-1, scale=False):
+def load_lfwc(path=LFWC_ROOT, shuffle=True, limit=-1):
     return load_matrix_2d(lfwc_paths(path, shuffle=shuffle, limit=limit))
 
 
@@ -149,9 +149,9 @@ if __name__ == "__main__":
         tiled = tile_images(patches, tile_shape, show=True)
 
     elif cmd == "patches":
-        shapes = [(i, i) for i in range(8, 12)]
+        shapes = [(i, i) for i in range(14, 20, 2)]
         for sh in shapes:
-            patches = load_lfwc_patches(sh, cache_dir="./cache")
+            patches = load_lfwc_patches(sh)
             img = tile_images(patches, sh, output_shape=(100, 100), show=True)
             fn = "./img/lfwc_patches_{}.png".format(sh)
             print("saving {}...".format(fn))

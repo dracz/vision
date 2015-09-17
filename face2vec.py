@@ -1,10 +1,9 @@
 import itertools
 
-from lfw import lfwc_paths, sample_patches, all_patches
-from images import scale_input
+from lfw import lfwc_paths, sample_patches, load_lfwc_patches
 from dae import DenoisingAutoencoder
 from nn import render_filters
-from transform import PCA
+from transform import PCA, scale_input
 import numpy as np
 from matplotlib import pyplot as plt
 import theano
@@ -19,6 +18,7 @@ def get_input(paths=lfwc_paths(), n_samples=100000, patch_shape=(14, 14), whiten
     print("Sampling {} input patches of shape {}...".format(n_samples, patch_shape))
     x = [p.flatten() for p in sample_patches(paths, patch_shape, n_samples)]
     a = np.asarray(x, dtype=theano.config.floatX)
+    pca = None
 
     if show:
         display_patches(a, patch_shape, rows=10, cols=10)
@@ -120,7 +120,7 @@ def sweep_params(n_samples=50000, rates=None, tile_range=None,
             whitens = [None]
 
         for whiten in whitens:
-            patches = get_input(n_samples=n_samples, patch_shape=patch_shape, whiten=whiten, show=False)
+            patches, pca = get_input(n_samples=n_samples, patch_shape=patch_shape, whiten=whiten, show=False)
 
             for rate in rates:
                 if n_hidden_range is None:
@@ -130,7 +130,7 @@ def sweep_params(n_samples=50000, rates=None, tile_range=None,
                     train_dae(patches=patches, n_hidden=h, patch_shape=patch_shape, whiten=whiten,
                               corruption_rate=rate, save=save, show=show)
 
-
 if __name__ == "__main__":
-    #sweep_params(rates=[0.3], tile_range=[20], n_hidden_range=[100], whitens=[(1, 1)])
-    pass
+    sh = (14, 14)
+    #train_dae(patches.reshape(patches.shape[0], sh[0]*sh[1]), sh, n_hidden=100, batch_size=1000, show=True)
+

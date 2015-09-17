@@ -1,79 +1,46 @@
-__author__ = 'dracz'
 
+import timeit
 import numpy
 import theano
-import timeit
-
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
-
-from PIL import Image
-from utils import tile_raster_images
-
-default_n_visible = 16 * 16
-default_n_hidden = 10000
-
-default_corruption_rate = 0.3
-default_learning_rate = 0.01
-
-default_n_epochs = 1000
-default_batch_size = 500
 
 
 class SparseAutoencoder(object):
     """ A sparse autoencoder """
 
-    def __init__(self, n_visible=default_n_visible, n_hidden=default_n_hidden, wv=None, wh=None, bh=None, bv=None):
+    def __init__(self, n_in=400, n_hidden=100, w=None, w_prime=None, b=None, b_prime=None):
 
-        self.n_visible = n_visible
+        self.n_visible = n_in
         self.n_hidden = n_hidden
 
         numpy_rng = numpy.random.RandomState(123)
-        theano_rng = RandomStreams(numpy_rng.randint(2 ** 30))
 
-        if not wh:
-            wh = init_weights(n_visible, n_hidden, numpy_rng)
+        self.w = weights(w, n_in, n_hidden, numpy_rng, "w")
 
-        if not bv:
-            zv = numpy.zeros(n_visible, dtype=theano.config.floatX)
-            bv = theano.shared(value=zv, borrow=True)
+        self.w_prime = weights(w_prime, n_hidden, n_in, numpy_rng, "w_prime")
 
-        if not bh:
-            zh = numpy.zeros(n_hidden, dtype=theano.config.floatX)
-            bh = theano.shared(value=zh, name='b', borrow=True)
+        self.b = zeros(n_in, "b") if b_prime is None else b_prime
+        self.b_prime = zeros(n_hidden, "b_prime") if b is None else b
 
-        self.w = w  # weights
-        self.b = bh  # bias of hidden units
-        self.b_prime = bv  # bias of visible units
-        self.w_prime = self.w.T  # tied weights, W_prime = W transpose
-        self.theano_rng = theano_rng
+        self.theano_rng = RandomStreams(numpy_rng.randint(2 ** 30))
 
         self.x = T.dmatrix(name='input')
-        self.params = [self.w, self.b, self.b_prime]
+        self.params = [self.w, self.w_prime, self.b, self.b_prime]
 
-    def get_corrupted_input(self, data, corruption_level):
-        """corrupt the image """
-        return self.theano_rng.binomial(size=data.shape, n=1,
-                                        p=1 - corruption_level,
-                                        dtype=theano.config.floatX) * data
+    def get_cost_updates(self, sparsity, learning_rate):
+        """ Compute the cost and the parameter updates for one training step """
 
-    def get_hidden_values(self, data):
-        """ Computes the values of the hidden layer """
-        return T.nnet.sigmoid(T.dot(data, self.w) + self.b)
+        # activation of hidden layer
+        a = T.nnet.sigmoid(T.dot(self.x, self.w) + self.b)
 
-    def get_reconstructed_input(self, hidden):
-        """Computes the reconstructed input from values of the hidden layer"""
-        return T.nnet.sigmoid(T.dot(hidden, self.w_prime) + self.b_prime)
+        # output, ie reconstruction of input
+        z = T.nnet.sigmoid(T.dot(a, self.w_prime) + self.b_prime)
 
-    def get_cost_updates(self, corruption_rate, learning_rate):
-        """ This function computes the cost and the updates for one training step"""
-        tilde_x = self.get_corrupted_input(self.x, corruption_rate)
-
-        y = T.nnet.sigmoid(T.dot(tilde_x, self.w) + self.b)
-        z = T.nnet.sigmoid(T.dot(y, self.w_prime) + self.b_prime)
+        print(a.shape)
+        rho = a.mean()
 
         l = square_error(self.x, z)
-        # l = cross_entropy(self.x, z)
 
         cost = T.mean(l)
         grads = T.grad(cost, self.params)
@@ -83,11 +50,7 @@ class SparseAutoencoder(object):
             ]
         return cost, updates
 
-    def train(self, train_set,
-              batch_size=default_batch_size,
-              corruption_rate=default_corruption_rate,
-              learning_rate=default_learning_rate,
-              n_epochs=default_n_epochs):
+    def train(self, train_set, batch_size=100, sparsity=0.05, learning_rate=0.1, n_epochs=15):
 
         n_training = train_set.get_value(borrow=True).shape[0]
         n_train_batches = n_training / batch_size
@@ -95,7 +58,7 @@ class SparseAutoencoder(object):
         index = T.lscalar()  # index into mini-batch
 
         cost, updates = self.get_cost_updates(
-            corruption_rate=corruption_rate,
+            sparsity=sparsity,
             learning_rate=learning_rate
         )
 
@@ -124,19 +87,19 @@ class SparseAutoencoder(object):
         training_time = (t2 - t1)
         print('Training took {:.2f}'.format(training_time))
 
-    def render_filters(self, img_shape, tile_shape):
-        return Image.fromarray(tile_raster_images(
-            X=self.w.get_value(borrow=True).T,
-            img_shape=img_shape, tile_shape=tile_shape,
-            tile_spacing=(1, 1)))
+
+def zeros(n, name):
+    zh = numpy.zeros(n, dtype=theano.config.floatX)
+    return theano.shared(value=zh, name=name, borrow=True)
 
 
-def init_weights(n_visible, n_hidden, rng):
-    dist = rng.uniform(low=-4 * numpy.sqrt(6. / (n_hidden + n_visible)),
-                       high=4 * numpy.sqrt(6. / (n_hidden + n_visible)),
-                       size=(n_visible, n_hidden))
+def weights(data, n_from, n_to, rng, name="w"):
+    if data is not None: return data
+    dist = rng.uniform(low=-4 * numpy.sqrt(6. / (n_to + n_from)),
+                       high=4 * numpy.sqrt(6. / (n_to + n_from)),
+                       size=(n_from, n_to))
     w = numpy.asarray(dist, dtype=theano.config.floatX)
-    return theano.shared(value=w, name='w', borrow=True)
+    return theano.shared(value=w, name=name, borrow=True)
 
 
 def get_batch(data, index, batch_size):
@@ -149,4 +112,5 @@ def cross_entropy(x, z):
 
 def square_error(x, z):
     return T.square(x - z)
+
 
