@@ -4,45 +4,45 @@ import numpy
 import theano
 import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
+from nn import *
 
 
 class SparseAutoencoder(object):
     """ A sparse autoencoder """
 
-    def __init__(self, n_in=400, n_hidden=100, w=None, w_prime=None, b=None, b_prime=None):
+    def __init__(self, n_visible=400, n_hidden=100, w1=None, w2=None, b1=None, b2=None, loss=square_error):
 
-        self.n_visible = n_in
+        self.n_visible = n_visible
         self.n_hidden = n_hidden
 
         numpy_rng = numpy.random.RandomState(123)
 
-        self.w = weights(w, n_in, n_hidden, numpy_rng, "w")
+        self.w1 = init_weights(w1, n_visible, n_hidden, numpy_rng, name="w1")
+        self.w2 = init_weights(w2, n_hidden, n_visible, numpy_rng, name="w2")
 
-        self.w_prime = weights(w_prime, n_hidden, n_in, numpy_rng, "w_prime")
-
-        self.b = zeros(n_in, "b") if b_prime is None else b_prime
-        self.b_prime = zeros(n_hidden, "b_prime") if b is None else b
+        self.b1 = init_bias(b1, n_hidden, "b1")
+        self.b2 = init_bias(b2, n_visible, "b2")
 
         self.theano_rng = RandomStreams(numpy_rng.randint(2 ** 30))
 
         self.x = T.dmatrix(name='input')
-        self.params = [self.w, self.w_prime, self.b, self.b_prime]
+        self.params = [self.w1, self.w2, self.b1, self.b2]
 
-    def get_cost_updates(self, sparsity, learning_rate):
+    def get_cost_updates(self, beta, sparsity, weight_decay, learning_rate):
         """ Compute the cost and the parameter updates for one training step """
 
-        # activation of hidden layer
-        a = T.nnet.sigmoid(T.dot(self.x, self.w) + self.b)
+        a1 = self.x  # activation of first layer is the input
+        a2 = T.nnet.sigmoid(T.dot(a1, self.w1) + self.b1)  # activation of hidden layer
+        a3 = T.nnet.sigmoid(T.dot(a2, self.w2) + self.b2)  # activation of output layer (reconstruction of input)
 
-        # output, ie reconstruction of input
-        z = T.nnet.sigmoid(T.dot(a, self.w_prime) + self.b_prime)
+        #e = mse(self.x, a3)  # square error
+        e = T.mean(cross_entropy(a1, a3))
 
-        print(a.shape)
-        rho = a.mean()
+        wd = weight_decay * ((self.w1**2).sum() + (self.w2**2).sum())
+        sp = beta * T.sum(kl(sparsity, a2.mean(axis=0)))  # sparseness penalty
 
-        l = square_error(self.x, z)
+        cost = e + wd + sp
 
-        cost = T.mean(l)
         grads = T.grad(cost, self.params)
 
         updates = [
@@ -50,15 +50,24 @@ class SparseAutoencoder(object):
             ]
         return cost, updates
 
-    def train(self, train_set, batch_size=100, sparsity=0.05, learning_rate=0.1, n_epochs=15):
-
-        n_training = train_set.get_value(borrow=True).shape[0]
+    def train(self, data, batch_size=20, beta=3, sparsity=0.05, weight_decay=0.001, learning_rate=0.1, n_epochs=15):
+        """
+        Train the model
+        :param data: A theano shared variable of ndarray of shape [n_examples, n_features]
+        :param batch_size: Mini-batch size
+        :param sparsity: Sparsity parameter
+        :param learning_rate: Learning rate
+        :param n_epochs: Number of training epochs
+        """
+        n_training = data.get_value(borrow=True).shape[0]
         n_train_batches = n_training / batch_size
 
         index = T.lscalar()  # index into mini-batch
 
         cost, updates = self.get_cost_updates(
+            beta=beta,
             sparsity=sparsity,
+            weight_decay=weight_decay,
             learning_rate=learning_rate
         )
 
@@ -66,7 +75,7 @@ class SparseAutoencoder(object):
             [index],
             cost,
             updates=updates,
-            givens={self.x: get_batch(train_set, index, batch_size)}
+            givens={self.x: get_batch(data, index, batch_size)}
         )
 
         print("Starting to train using {} examples and {} batches of {}..."
@@ -88,29 +97,11 @@ class SparseAutoencoder(object):
         print('Training took {:.2f}'.format(training_time))
 
 
-def zeros(n, name):
-    zh = numpy.zeros(n, dtype=theano.config.floatX)
-    return theano.shared(value=zh, name=name, borrow=True)
-
-
-def weights(data, n_from, n_to, rng, name="w"):
-    if data is not None: return data
-    dist = rng.uniform(low=-4 * numpy.sqrt(6. / (n_to + n_from)),
-                       high=4 * numpy.sqrt(6. / (n_to + n_from)),
-                       size=(n_from, n_to))
-    w = numpy.asarray(dist, dtype=theano.config.floatX)
-    return theano.shared(value=w, name=name, borrow=True)
-
-
-def get_batch(data, index, batch_size):
-    return data[index * batch_size: (index + 1) * batch_size]
-
-
-def cross_entropy(x, z):
-    return - T.sum(x * T.log(z) + (1 - x) * T.log(1 - z), axis=1)
-
-
-def square_error(x, z):
-    return T.square(x - z)
+def train(data, n_visible=16*16, n_hidden=200, batch_size=20, corruption_rate=0.3,
+          learning_rate=0.1, n_epochs=15, stop_diff=None):
+    """train a new autoencoder"""
+    ae = SparseAutoencoder(n_visible=n_visible, n_hidden=n_hidden)
+    ae.train(data, batch_size=batch_size, learning_rate=learning_rate, n_epochs=n_epochs)
+    return ae
 
 

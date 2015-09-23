@@ -7,7 +7,7 @@ from nn import render_filters
 from images import plot_images, sample_patches
 from lfw import LFWC_PATTERN
 
-from dae import DenoisingAutoencoder
+import dae, sae
 
 
 def get_input(input_pattern=LFWC_PATTERN,
@@ -50,10 +50,10 @@ def get_input(input_pattern=LFWC_PATTERN,
     if epsilon is None:
         return normed
 
-    return whiten(normed, epsilon=epsilon)
+    return whiten_zca(normed, epsilon=epsilon)
 
 
-def whiten(data, epsilon=0.1):
+def whiten_zca(data, epsilon=0.1):
     """whiten the m x n array of images"""
     U, S, V = np.linalg.svd(np.cov(data.T), full_matrices=False)
     tmp = np.dot(U, np.diag(1. / np.sqrt(S + epsilon)))
@@ -62,61 +62,57 @@ def whiten(data, epsilon=0.1):
     return z.T
 
 
-def train_dae(patch_shape=(20,20),
-              n_hidden=400,
-              n_samples=50000,
-              batch_size=500,
-              epsilon=0.1,
-              show_input=False,
-              show_filters=True,
-              img_dir=None,
-              norm_axis=0):
+def train_ae(ae, patch_shape=(20, 20), n_hidden=400, n_samples=50000,
+             batch_size=500, epsilon=0.1, show_input=False, show_filters=True,
+             img_dir=None, norm_axis=0):
 
-    """ train a denoising autoencoder """
-
+    """ train an autoencoder """
     data = get_input(n_samples=n_samples, patch_shape=patch_shape, epsilon=epsilon, norm_axis=norm_axis)
+    data = theano.shared(data, borrow=True)
+
     if show_input:
         plot_images(data, shape=patch_shape)
 
-    da = DenoisingAutoencoder(n_visible=patch_shape[0]*patch_shape[1],
-                              n_hidden=n_hidden)
-
-    da.train(theano.shared(data), batch_size=batch_size)
+    n_vis = patch_shape[0]*patch_shape[1]
+    trained = ae.train(data, n_visible=n_vis, n_hidden=n_hidden, batch_size=batch_size)
 
     if img_dir is not None:
-        fn = os.path.join(img_dir, "face_filters_{}_{}_{}_{}_{}_{}.png"
-                          .format(patch_shape, n_hidden, n_samples, batch_size, epsilon, norm_axis))
+        fp = os.path.join(img_dir, "ff_{}_{}_{}_{}_{}_{}_{}.png"
+                          .format(ae.__name__, patch_shape, n_hidden, n_samples, batch_size, epsilon, norm_axis))
     else:
-        fn = None
+        fp = None
 
-    render_filters(da.w.get_value(borrow=True), patch_shape, show=show_filters, image_file=fn)
+    render_filters(trained.w1.get_value(borrow=True), patch_shape, show=show_filters, image_file=fp)
 
 
-def sweep(patch_shapes=[(24, 24)],
+def sweep(autoencoders,
+          patch_shapes=[(12,12)],
           n_samples=20000,
           batch_size=20,
-          epsilons=[0.1, 0.01],
-          n_hiddens=[100, 400],
+          epsilons=[0.05],
+          n_hiddens=[64],
           norm_axes=[0],
           img_dir="./img/face_filters"):
 
-    """train autoencoders using range of params, render and save filters"""
-
-    for patch_shape in patch_shapes:
-        for eps in epsilons:
-            for axis in norm_axes:
-                for n_hidden in n_hiddens:
-                    train_dae(patch_shape=patch_shape,
-                              batch_size=batch_size,
-                              n_samples=n_samples,
-                              n_hidden=n_hidden,
-                              epsilon=eps,
-                              img_dir=img_dir,
-                              norm_axis=axis)
+    """train autoencoders for specified ranges of parameters,
+     render and save filter images"""
+    for ae in autoencoders:
+        for patch_shape in patch_shapes:
+            for eps in epsilons:
+                for axis in norm_axes:
+                    for n_hidden in n_hiddens:
+                        train_ae(ae, patch_shape=patch_shape,
+                                 batch_size=batch_size,
+                                 n_samples=n_samples,
+                                 n_hidden=n_hidden,
+                                 epsilon=eps,
+                                 img_dir=img_dir,
+                                 norm_axis=axis)
 
 
 if __name__ == "__main__":
-    sweep()
+    sweep([dae])
+
 
 
 

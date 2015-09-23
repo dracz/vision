@@ -51,21 +51,33 @@ def render_filters(w, sh, image_file=None, axis=0, sp=1, show=False):
     return img
 
 
-def init_weights(n_visible, n_hidden, rng, shared=True):
+def init_bias(b, n, name, shared=True):
+    if b is not None:
+        return b
+    z = np.zeros(n, dtype=theano.config.floatX)
+    if not shared:
+        return z
+    return theano.shared(value=z, name=name, borrow=True)
+
+
+def init_weights(w, n_visible, n_hidden, rng, shared=True, name="w"):
     """
     Randomly initialize weights to small values
+    :param w: If w is not None, then already initialized, return w
     :param n_visible: Number of input units
     :param n_hidden: Number of hidden units
     :param rng: Theano RandomStreams
     :return: ndarray of floats as theano shared variable
     """
+    if w is not None:
+        return w
     dist = rng.uniform(low=-4 * np.sqrt(6. / (n_hidden + n_visible)),
                        high=4 * np.sqrt(6. / (n_hidden + n_visible)),
                        size=(n_visible, n_hidden))
     w = np.asarray(dist, dtype=theano.config.floatX)
     if not shared:
         return w
-    return theano.shared(value=w, name='w', borrow=True)
+    return theano.shared(value=w, name=name, borrow=True)
 
 
 def get_batch(data, index, batch_size):
@@ -77,7 +89,16 @@ def cross_entropy(x, z):
 
 
 def square_error(x, z):
-    return T.square(x - z)
+    return (z - x)**2
+
+
+def mse(x, z):
+    return T.mean((z - x)**2)
+
+
+def kl(p, q):
+    """kl-divergence of bernoulli rand variables with specified means"""
+    return p * T.log(p/q) + (1-p) * T.log((1 - p)/(1 - q))
 
 
 def scale_interval(nda, min_val=0, max_val=1, eps=1e-8):
@@ -85,5 +106,4 @@ def scale_interval(nda, min_val=0, max_val=1, eps=1e-8):
     x = nda.copy()
     x_max, x_min = x.max(), x.min()
     return (1.0 * (x - x_min) * (max_val - min_val) / (x_max - x_min + eps)) + min_val
-
 

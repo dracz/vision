@@ -1,6 +1,10 @@
 
 import timeit
+import theano
+import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
+import numpy as np
+
 from nn import *
 
 
@@ -14,8 +18,7 @@ class DenoisingAutoencoder(object):
     http://deeplearning.net/tutorial/dA.html
     """
 
-    def __init__(self, n_visible=16*16, n_hidden=200,
-                 x=None, w=None, bh=None, bv=None):
+    def __init__(self, n_visible=16*16, n_hidden=200, x=None, w1=None, b1=None, b2=None):
 
         self.n_visible = n_visible
         self.n_hidden = n_hidden
@@ -23,28 +26,21 @@ class DenoisingAutoencoder(object):
         numpy_rng = np.random.RandomState(rng_seed)
         theano_rng = RandomStreams(numpy_rng.randint(rng_n))
 
+        self.theano_rng = theano_rng
+
         if not x:
             x = T.dmatrix(name='input')
 
-        if not w:
-            w = init_weights(n_visible, n_hidden, numpy_rng)
-
-        if not bv:
-            zv = np.zeros(n_visible, dtype=theano.config.floatX)
-            bv = theano.shared(value=zv, borrow=True)
-
-        if not bh:
-            zh = np.zeros(n_hidden, dtype=theano.config.floatX)
-            bh = theano.shared(value=zh, name='b', borrow=True)
-
-        self.w = w  # weights
-        self.b = bh  # bias of hidden units
-        self.b_prime = bv  # bias of visible units
-        self.w_prime = self.w.T  # tied weights
-        self.theano_rng = theano_rng
-
         self.x = x
-        self.params = [self.w, self.b, self.b_prime]
+
+        self.w1 = init_weights(w1, n_visible, n_hidden, numpy_rng)
+        self.w2 = self.w1.T
+
+        self.b1 = init_bias(b1, n_hidden, "b1")
+        self.b2 = init_bias(b2, n_visible, "b2")
+
+        self.params = [self.w1, self.b1, self.b2]
+
         print("Initialized network with {} input units and {} hidden units".format(n_visible, n_hidden))
 
     def get_corrupted_input(self, data, corruption_level=0.3):
@@ -55,21 +51,19 @@ class DenoisingAutoencoder(object):
 
     def get_hidden_values(self, data):
         """ Computes the values of the hidden layer """
-        return T.nnet.sigmoid(T.dot(data, self.w) + self.b)
+        return T.nnet.sigmoid(T.dot(data, self.w1) + self.b1)
 
     def get_reconstructed_input(self, hidden):
         """Computes the reconstructed input from values of the hidden layer"""
-        return T.nnet.sigmoid(T.dot(hidden, self.w_prime) + self.b_prime)
+        return T.nnet.sigmoid(T.dot(hidden, self.w2) + self.b2)
 
     def get_cost_updates(self, corruption_rate=0.3, learning_rate=0.1):
         """ This function computes the cost and the updates for one training step"""
         tilde_x = self.get_corrupted_input(self.x, corruption_rate)
-
         y = self.get_hidden_values(tilde_x)
         z = self.get_reconstructed_input(y)
-
+        #l = square_error(self.x, z)
         l = cross_entropy(self.x, z)
-
         cost = T.mean(l)
         grads = T.grad(cost, self.params)
 
@@ -78,11 +72,11 @@ class DenoisingAutoencoder(object):
             ]
         return cost, updates
 
-    def train(self, train_set, batch_size=20, corruption_rate=0.3,
+    def train(self, data, batch_size=20, corruption_rate=0.3,
               learning_rate=0.1, n_epochs=15, stop_diff=None):
-        """train the autoencoder. train_set is a theano shared ndarray with examples in rows"""
+        """train the autoencoder. data is a theano shared ndarray with examples in rows"""
 
-        n_training = train_set.get_value(borrow=True).shape[0]
+        n_training = data.get_value(borrow=True).shape[0]
         n_train_batches = n_training / batch_size
 
         index = T.lscalar()  # index into mini-batch
@@ -96,7 +90,7 @@ class DenoisingAutoencoder(object):
             [index],
             cost,
             updates=updates,
-            givens={self.x: get_batch(train_set, index, batch_size)}
+            givens={self.x: get_batch(data, index, batch_size)}
         )
 
         print("Starting to train using {} examples, {} epochs, and {} batches of {}..."
@@ -132,5 +126,14 @@ class DenoisingAutoencoder(object):
         training_time = (t2 - t1)
         print('Training took {:.2f}'.format(training_time))
 
+
+def train(data, n_visible=16*16, n_hidden=200, batch_size=5, corruption_rate=0.0,
+          learning_rate=0.01, n_epochs=30, stop_diff=None):
+
+    """train a new autoencoder"""
+    da = DenoisingAutoencoder(n_visible=n_visible, n_hidden=n_hidden)
+    da.train(data, batch_size=batch_size, corruption_rate=corruption_rate,
+             learning_rate=learning_rate, n_epochs=n_epochs, stop_diff=stop_diff)
+    return da
 
 

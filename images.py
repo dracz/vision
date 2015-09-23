@@ -30,7 +30,7 @@ def load_matrix_3d(paths):
     return np.asarray(load_images(paths))
 
 
-def sample_patches(imgs, patch_shape=(12, 12), n_samples=10000):
+def sample_patches(imgs, patch_shape=(12, 12), n_samples=10000, flatten=False):
     """
     Sample n_samples of patch_shape from imgs (with replacement)
     :param imgs: ndarray of shape [n_imgs, n_img_rows, n_img_cols]
@@ -47,9 +47,12 @@ def sample_patches(imgs, patch_shape=(12, 12), n_samples=10000):
 
     for n in range(n_samples):
         i = np.random.randint(0, n_images)
-        r = np.random.randint(0, n_img_rows - n_patch_rows)
-        c = np.random.randint(0, n_img_cols - n_patch_cols)
+        r = np.random.randint(0, n_img_rows - n_patch_rows + 1)
+        c = np.random.randint(0, n_img_cols - n_patch_cols + 1)
         patches[n,:,:] = imgs[i, r:r + n_patch_rows, c:c + n_patch_cols]
+
+    if flatten:
+        return patches.reshape(patches.shape[0], patch_shape[0]*patch_shape[1])
 
     return patches
 

@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw
 from matplotlib import pyplot as plt
 
 from images import sample_patches
-from lfw import lfwc_paths
+from lfw import lfwc_paths, load_lfwc
 
 __author__ = 'dracz'
 
@@ -151,6 +151,15 @@ class PCA:
         return np.dot(tmp, x-mean), mean
 
 
+def whiten_zca(data, epsilon=0.1):
+    """whiten the m x n array of images"""
+    U, S, V = np.linalg.svd(np.cov(data.T), full_matrices=False)
+    tmp = np.dot(U, np.diag(1. / np.sqrt(S + epsilon)))
+    tmp = np.dot(tmp, U.T)
+    z = np.dot(tmp, data.T)
+    return z.T
+
+
 def test_pca_input(sh, m):
     """
     Generate input data from labeled faces data
@@ -158,11 +167,10 @@ def test_pca_input(sh, m):
     :param m: The number of examples to sample
     :return: 2d ndarray where columns are examples
     """
-    print("loading {} {} images...".format(m, sh))
-    return np.asarray([p.flatten() for p in list(sample_patches(lfwc_paths(), sh, m))]).T
+    return sample_patches(load_lfwc(), patch_shape=sh, n_samples=m, flatten=True).T
 
 
-def pca_faces_image(sh=(64, 64), m=500, n_faces=20, k_vals=None,
+def pca_faces_image(sh=(64, 64), m=5000, n_faces=20, k_vals=None,
                     out_dir="./img", test_in_sample=True):
     """
     Visualize the mean face images, then generate an image of faces
@@ -303,17 +311,14 @@ def test_zca_white(sh=(12, 12), m=500, n_faces=20, out_dir="img", eps=None, show
         plt.show()
 
 
-def pca_faces():
-    m_faces = 5000
-    n_faces = 20
-    face_shape = (12, 12)
-
-    pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=True)
-    pca_faces_image(sh=face_shape, m=m_faces, n_faces=n_faces, test_in_sample=False)
+def pca_faces(m=5000, n=20):
+    face_shape = (64, 64)
+    pca_faces_image(sh=face_shape, m=m, n_faces=n, test_in_sample=True)
+    pca_faces_image(sh=face_shape, m=m, n_faces=n, test_in_sample=False)
 
 
 def test_whitening():
-    m_patches = 300000
+    m_patches = 10000
     patch_sizes = [(i, i) for i in np.arange(8, 17)]
 
     for sh in patch_sizes:

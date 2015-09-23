@@ -5,7 +5,7 @@ this is ... we'll see
 # installing on Mac OS 10.10.5
 
     sudo port selfupdate
-    sudo port install python27 py27-numpy py27-scipy
+    sudo port install python27 py27-numpy py27-scipy py27-pil
     sudo port install opencv +python27
     sudo port select --set python python27
 
