@@ -33,6 +33,8 @@ def render_filters(w, sh, image_file=None, axis=0, sp=1, show=False):
 
     img = Image.new("L", out_shape, "black")
 
+    print("weights min: {}, max: {}, avg: {}".format(weights.min(), weights.max(), weights.mean()))
+
     for i, (r, c) in enumerate(itertools.product(range(rc), range(rc))):
         w_i = weights[:, i]
         v = w_i/np.sqrt(np.square(w_i).sum())
@@ -60,7 +62,7 @@ def init_bias(b, n, name, shared=True):
     return theano.shared(value=z, name=name, borrow=True)
 
 
-def init_weights(w, n_visible, n_hidden, rng, shared=True, name="w"):
+def init_weights(w, n_visible, n_hidden, rng, shared=True, name="w", activation=T.nnet.sigmoid):
     """
     Randomly initialize weights to small values
     :param w: If w is not None, then already initialized, return w
@@ -68,13 +70,22 @@ def init_weights(w, n_visible, n_hidden, rng, shared=True, name="w"):
     :param n_hidden: Number of hidden units
     :param rng: Theano RandomStreams
     :return: ndarray of floats as theano shared variable
+    see: http://citeseer.ist.psu.edu/viewdoc/summary?doi=10.1.1.207.2059
     """
     if w is not None:
         return w
-    dist = rng.uniform(low=-4 * np.sqrt(6. / (n_hidden + n_visible)),
-                       high=4 * np.sqrt(6. / (n_hidden + n_visible)),
+
+    if activation != T.nnet.sigmoid and activation != T.nnet.tanh:
+        raise ValueError("unknown activation function: {}".format(activation))
+
+    dist = rng.uniform(low=-np.sqrt(6. / (n_hidden + n_visible)),
+                       high=np.sqrt(6. / (n_hidden + n_visible)),
                        size=(n_visible, n_hidden))
     w = np.asarray(dist, dtype=theano.config.floatX)
+
+    if activation == T.nnet.sigmoid:
+        w *= 4
+
     if not shared:
         return w
     return theano.shared(value=w, name=name, borrow=True)
@@ -93,7 +104,7 @@ def square_error(x, z):
 
 
 def mse(x, z):
-    return T.mean((z - x)**2)
+    return T.mean(square_error(x, z))
 
 
 def kl(p, q):

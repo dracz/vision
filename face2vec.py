@@ -12,7 +12,7 @@ import dae, sae
 
 def get_input(input_pattern=LFWC_PATTERN,
               n_samples=5000, patch_shape=(12, 12),
-              n_images=100, epsilon=0.1, norm_axis=0):
+              n_images=-1, epsilon=0.1, norm_axis=0):
     """
     Get input data from lfwc patches
     :param input_pattern: The pattern to glob for image files
@@ -64,7 +64,8 @@ def whiten_zca(data, epsilon=0.1):
 
 def train_ae(ae, patch_shape=(20, 20), n_hidden=400, n_samples=50000,
              batch_size=500, epsilon=0.1, show_input=False, show_filters=True,
-             img_dir=None, norm_axis=0):
+             sparsity=0.01, beta=0.0, weight_decay=0.0, corruption_rate=0.3,
+             img_dir=None, norm_axis=0, n_epochs=5):
 
     """ train an autoencoder """
     data = get_input(n_samples=n_samples, patch_shape=patch_shape, epsilon=epsilon, norm_axis=norm_axis)
@@ -74,11 +75,18 @@ def train_ae(ae, patch_shape=(20, 20), n_hidden=400, n_samples=50000,
         plot_images(data, shape=patch_shape)
 
     n_vis = patch_shape[0]*patch_shape[1]
-    trained = ae.train(data, n_visible=n_vis, n_hidden=n_hidden, batch_size=batch_size)
+    trained = ae.train(data, n_visible=n_vis, n_hidden=n_hidden, batch_size=batch_size, sparsity=sparsity,
+                       weight_decay=weight_decay, beta=beta, corruption_rate=corruption_rate, n_epochs=n_epochs)
 
     if img_dir is not None:
-        fp = os.path.join(img_dir, "ff_{}_{}_{}_{}_{}_{}_{}.png"
-                          .format(ae.__name__, patch_shape, n_hidden, n_samples, batch_size, epsilon, norm_axis))
+        if ae.__name__ == "dae":
+            opts = "_{}".format(corruption_rate)
+        elif ae.__name__ == "sae":
+            opts = "_{}_{}_{}".format(weight_decay, beta, sparsity)
+
+        fp = os.path.join(img_dir, "ff_{}_{}_{}_{}_{}_{}_{}{}.png"
+                          .format(ae.__name__, patch_shape, n_hidden,
+                                  n_samples, batch_size, epsilon, norm_axis, opts))
     else:
         fp = None
 
@@ -86,12 +94,17 @@ def train_ae(ae, patch_shape=(20, 20), n_hidden=400, n_samples=50000,
 
 
 def sweep(autoencoders,
-          patch_shapes=[(12,12)],
-          n_samples=20000,
-          batch_size=20,
+          patch_shapes=[(8, 8)],
+          n_samples=200000,
+          batch_size=5,
           epsilons=[0.05],
-          n_hiddens=[64],
+          n_hiddens=[100],
+          corruption_rates=[0.3],
+          betas=[3],
+          sparsities=[0.05],
+          weight_decays=[0.0001],
           norm_axes=[0],
+          n_epochs=5,
           img_dir="./img/face_filters"):
 
     """train autoencoders for specified ranges of parameters,
@@ -101,13 +114,23 @@ def sweep(autoencoders,
             for eps in epsilons:
                 for axis in norm_axes:
                     for n_hidden in n_hiddens:
-                        train_ae(ae, patch_shape=patch_shape,
-                                 batch_size=batch_size,
-                                 n_samples=n_samples,
-                                 n_hidden=n_hidden,
-                                 epsilon=eps,
-                                 img_dir=img_dir,
-                                 norm_axis=axis)
+                        for corruption_rate in corruption_rates:
+                            for beta in betas:
+                                for sparsity in sparsities:
+                                    for weight_decay in weight_decays:
+                                        train_ae(ae,
+                                                 patch_shape=patch_shape,
+                                                 batch_size=batch_size,
+                                                 n_samples=n_samples,
+                                                 n_hidden=n_hidden,
+                                                 epsilon=eps,
+                                                 corruption_rate=corruption_rate,
+                                                 beta=beta,
+                                                 sparsity=sparsity,
+                                                 weight_decay=weight_decay,
+                                                 img_dir=img_dir,
+                                                 norm_axis=axis,
+                                                 n_epochs=n_epochs)
 
 
 if __name__ == "__main__":

@@ -127,9 +127,9 @@ class DenoisingAutoencoder(object):
         print('Training took {:.2f}'.format(training_time))
 
 
-def train(data, n_visible=16*16, n_hidden=200, batch_size=5, corruption_rate=0.0,
-          learning_rate=0.01, n_epochs=30, stop_diff=None):
-
+def train(data, n_visible=16*16, n_hidden=200, batch_size=20,
+          learning_rate=0.1, n_epochs=5, beta=3.0, sparsity=0.0,
+          weight_decay=0.0, stop_diff=None, corruption_rate=0.3):
     """train a new autoencoder"""
     da = DenoisingAutoencoder(n_visible=n_visible, n_hidden=n_hidden)
     da.train(data, batch_size=batch_size, corruption_rate=corruption_rate,

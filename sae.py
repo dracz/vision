@@ -10,7 +10,7 @@ from nn import *
 class SparseAutoencoder(object):
     """ A sparse autoencoder """
 
-    def __init__(self, n_visible=400, n_hidden=100, w1=None, w2=None, b1=None, b2=None, loss=square_error):
+    def __init__(self, n_visible=400, n_hidden=100, w1=None, w2=None, b1=None, b2=None):
 
         self.n_visible = n_visible
         self.n_hidden = n_hidden
@@ -28,6 +28,9 @@ class SparseAutoencoder(object):
         self.x = T.dmatrix(name='input')
         self.params = [self.w1, self.w2, self.b1, self.b2]
 
+        self.L1 = (abs(self.w1).sum() + abs(self.w2).sum())
+        self.L2 = ((self.w1 ** 2).sum() + (self.w2 ** 2).sum())
+
     def get_cost_updates(self, beta, sparsity, weight_decay, learning_rate):
         """ Compute the cost and the parameter updates for one training step """
 
@@ -35,13 +38,12 @@ class SparseAutoencoder(object):
         a2 = T.nnet.sigmoid(T.dot(a1, self.w1) + self.b1)  # activation of hidden layer
         a3 = T.nnet.sigmoid(T.dot(a2, self.w2) + self.b2)  # activation of output layer (reconstruction of input)
 
-        #e = mse(self.x, a3)  # square error
         e = T.mean(cross_entropy(a1, a3))
 
-        wd = weight_decay * ((self.w1**2).sum() + (self.w2**2).sum())
+        wd = weight_decay * self.L2  # L2 regularization
         sp = beta * T.sum(kl(sparsity, a2.mean(axis=0)))  # sparseness penalty
 
-        cost = e + wd + sp
+        cost = e + wd # + sp
 
         grads = T.grad(cost, self.params)
 
@@ -50,7 +52,7 @@ class SparseAutoencoder(object):
             ]
         return cost, updates
 
-    def train(self, data, batch_size=20, beta=3, sparsity=0.05, weight_decay=0.001, learning_rate=0.1, n_epochs=15):
+    def train(self, data, batch_size=20, beta=3.0, sparsity=0.0, weight_decay=0.0, learning_rate=0.1, n_epochs=15):
         """
         Train the model
         :param data: A theano shared variable of ndarray of shape [n_examples, n_features]
@@ -84,12 +86,13 @@ class SparseAutoencoder(object):
         t1 = timeit.default_timer()
 
         for epoch in xrange(n_epochs):
-            c = []
+            costs = []
 
             for batch_index in xrange(n_train_batches):
-                c.append(train_da(batch_index))
+                c = train_da(batch_index)
+                costs.append(c)
 
-            print('Epoch: {}, Cost: {}'.format(epoch, numpy.mean(c)))
+            print('Epoch: {}, Cost: {}'.format(epoch, numpy.mean(costs)))
 
         t2 = timeit.default_timer()
 
@@ -97,11 +100,13 @@ class SparseAutoencoder(object):
         print('Training took {:.2f}'.format(training_time))
 
 
-def train(data, n_visible=16*16, n_hidden=200, batch_size=20, corruption_rate=0.3,
-          learning_rate=0.1, n_epochs=15, stop_diff=None):
+def train(data, n_visible=16*16, n_hidden=200, batch_size=20,
+          learning_rate=0.1, n_epochs=5, beta=3.0, sparsity=0.0,
+          weight_decay=0.0, stop_diff=None, corruption_rate=None):
     """train a new autoencoder"""
     ae = SparseAutoencoder(n_visible=n_visible, n_hidden=n_hidden)
-    ae.train(data, batch_size=batch_size, learning_rate=learning_rate, n_epochs=n_epochs)
+    ae.train(data, batch_size=batch_size, learning_rate=learning_rate,
+             n_epochs=n_epochs, beta=beta, sparsity=sparsity, weight_decay=weight_decay)
     return ae
 
 
