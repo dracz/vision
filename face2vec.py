@@ -94,7 +94,7 @@ def train_ae(ae, patch_shape=(20, 20), n_hidden=400, n_samples=50000,
 
 
 def sweep(autoencoders,
-          patch_shapes=[(8, 8)],
+          patch_shapes=[(20, 20)],
           n_samples=200000,
           batch_size=5,
           epsilons=[0.05],
@@ -104,7 +104,7 @@ def sweep(autoencoders,
           sparsities=[0.05],
           weight_decays=[0.0001],
           norm_axes=[0],
-          n_epochs=5,
+          n_epochs=10,
           img_dir="./img/face_filters"):
 
     """train autoencoders for specified ranges of parameters,
@@ -134,7 +134,7 @@ def sweep(autoencoders,
 
 
 if __name__ == "__main__":
-    sweep([dae])
+    sweep([sae])
 
 
 

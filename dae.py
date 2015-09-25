@@ -96,7 +96,7 @@ class DenoisingAutoencoder(object):
         print("Starting to train using {} examples, {} epochs, and {} batches of {}..."
               .format(n_training, n_epochs, n_train_batches, batch_size))
 
-        print("corruption rate = {}, learning rate = {}"
+        print("Corruption rate = {}, learning rate = {}"
               .format(corruption_rate, learning_rate))
 
         t1 = timeit.default_timer()

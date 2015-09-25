@@ -84,15 +84,21 @@ class SparseAutoencoder(object):
               .format(n_training, n_train_batches, batch_size))
 
         t1 = timeit.default_timer()
+        last_cost = None
 
         for epoch in xrange(n_epochs):
-            costs = []
+            c = []
 
-            for batch_index in xrange(n_train_batches):
-                c = train_da(batch_index)
-                costs.append(c)
+            for batch_index in range(n_train_batches):
+                c.append(train_da(batch_index))
 
-            print('Epoch: {}, Cost: {}'.format(epoch, numpy.mean(costs)))
+            avg_cost = np.mean(c)
+
+            diff = None if last_cost is None else (avg_cost - last_cost) / last_cost
+            ds = "" if diff is None else " ({:.4%})".format(diff)
+            print('Epoch: {}, Cost: {}{}'.format(epoch, avg_cost, ds))
+
+            last_cost = avg_cost
 
         t2 = timeit.default_timer()
 
