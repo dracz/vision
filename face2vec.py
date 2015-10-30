@@ -5,12 +5,12 @@ import cv2, theano
 import numpy as np
 from nn import render_filters
 from images import plot_images, sample_patches
-from lfw import LFWC_PATTERN
+from faces import lfwc_pattern
 
 import dae, sae
 
 
-def get_input(input_pattern=LFWC_PATTERN,
+def get_input(input_pattern=lfwc_pattern,
               n_samples=5000, patch_shape=(12, 12),
               n_images=-1, epsilon=0.1, norm_axis=0):
     """
@@ -32,7 +32,7 @@ def get_input(input_pattern=LFWC_PATTERN,
 
     # read images into a m x img_row x img_col ndarray
     imgs = np.asarray([cv2.imread(path, 0) for path in paths], dtype=theano.config.floatX)
-    imgs /= 255.  # scale to [0,1] # why is this so crucial?
+    imgs /= 255.  # scale to [0,1]
 
     # sample patches into a 3d array
     patches = sample_patches(imgs, patch_shape=patch_shape, n_samples=n_samples)
@@ -91,6 +91,7 @@ def train_ae(ae, patch_shape=(20, 20), n_hidden=400, n_samples=50000,
         fp = None
 
     render_filters(trained.w1.get_value(borrow=True), patch_shape, show=show_filters, image_file=fp)
+    return trained
 
 
 def sweep(autoencoders,
@@ -118,19 +119,19 @@ def sweep(autoencoders,
                             for beta in betas:
                                 for sparsity in sparsities:
                                     for weight_decay in weight_decays:
-                                        train_ae(ae,
-                                                 patch_shape=patch_shape,
-                                                 batch_size=batch_size,
-                                                 n_samples=n_samples,
-                                                 n_hidden=n_hidden,
-                                                 epsilon=eps,
-                                                 corruption_rate=corruption_rate,
-                                                 beta=beta,
-                                                 sparsity=sparsity,
-                                                 weight_decay=weight_decay,
-                                                 img_dir=img_dir,
-                                                 norm_axis=axis,
-                                                 n_epochs=n_epochs)
+                                        t = train_ae(ae,
+                                                     patch_shape=patch_shape,
+                                                     batch_size=batch_size,
+                                                     n_samples=n_samples,
+                                                     n_hidden=n_hidden,
+                                                     epsilon=eps,
+                                                     corruption_rate=corruption_rate,
+                                                     beta=beta,
+                                                     sparsity=sparsity,
+                                                     weight_decay=weight_decay,
+                                                     img_dir=img_dir,
+                                                     norm_axis=axis,
+                                                     n_epochs=n_epochs)
 
 
 if __name__ == "__main__":

@@ -5,32 +5,41 @@ import re
 import string
 import sys
 import random
+import sqlite3 as sql3
 
 import cv2
 
 import detectors
 from images import load_matrix_3d
 from images import sample_patches, tile_images
+import config as cnf
 
 __author__ = 'dracz'
 
-LFW_PATTERN = "../../data/lfw/*/*.jpg"
-LFWC_PATTERN = "../../data/lfwcrop_grey/*/*.pgm"
+lfw_pattern = os.path.join(cnf.data_root, "lfw/*/*.jpg")
+lfwc_pattern = os.path.join(cnf.data_root, "lfwcrop_grey/*/*.pgm")
+alfw_db_file = os.path.join(cnf.data_root, "aflw/aflw/data/aflw.sqlite")
 
 
-def load_lfw(pattern=LFW_PATTERN, shuffle=True, limit=-1):
+def load_lfw(pattern=lfw_pattern, shuffle=True, limit=-1):
     """load lfw data into 3d ndarray of shape [m, patch_rows, patch_cols]"""
     print("Loading lfw data from {}...".format(pattern))
     return load_matrix_3d(lfw_paths(pattern, shuffle=shuffle, limit=limit))
 
 
-def load_lfwc(pattern=LFWC_PATTERN, shuffle=True, limit=-1):
+def load_lfwc(pattern=lfwc_pattern, shuffle=True, limit=-1):
     """load lfwc data into 3d ndarray of shape [m, patch_rows, patch_cols]"""
     print("Loading lfwc data from {}...".format(pattern))
     return load_matrix_3d(lfwc_paths(pattern, shuffle=shuffle, limit=limit))
 
 
-def lfw_paths(pattern=LFW_PATTERN, shuffle=True, limit=-1):
+def load_alfw():
+    conn = sql3.connect(alfw_db_file)
+    c = conn.cursor()
+    c.execute("select name from sqlite_master where type = 'table'")
+
+
+def lfw_paths(pattern=lfw_pattern, shuffle=True, limit=-1):
     """
     Get "labeled faces in the wild" (lfw) image files downloaded from:
     http://vis-www.cs.umass.edu/lfw/lfw.tgz
@@ -44,7 +53,7 @@ def lfw_paths(pattern=LFW_PATTERN, shuffle=True, limit=-1):
     return paths[:limit]
 
 
-def lfwc_paths(patter=LFWC_PATTERN, shuffle=True, limit=-1):
+def lfwc_paths(patter=lfwc_pattern, shuffle=True, limit=-1):
     """
     Get "cropped labeled faces in the wild" (lfwc) image files downloaded from:
     http://conradsanderson.id.au/lfwcrop/lfwcrop_grey.zip
@@ -52,7 +61,7 @@ def lfwc_paths(patter=LFWC_PATTERN, shuffle=True, limit=-1):
     :param shuffle: whether to read in random order; default=True
     :return: iterator of path-name strings
     """
-    paths = glob.glob(LFWC_PATTERN)
+    paths = glob.glob(lfwc_pattern)
     if shuffle:
         random.shuffle(paths)
     return paths[:limit]
@@ -124,16 +133,17 @@ def main(cmd, args):
 
     n_samples = 10000
     sh = (20, 20)
-    out_shape = (100, 100)
+    out_shape = (8, 8)
     data = load_lfw() if data_set == "lfw" else load_lfwc()
     out_dir = "./img/"
+    shape_range = range(8, 21, 2)
 
     if cmd == "sample":
         patches = sample_patches(data, patch_shape=sh, n_samples=n_samples)
         tile_images(patches, patch_shape=sh, output_shape=out_shape, show=True)
 
     elif cmd == "sweep":
-        shapes = [(i, i) for i in range(14, 20, 2)]
+        shapes = [(i, i) for i in shape_range]
         for sh in shapes:
             patches = sample_patches(data, n_samples=n_samples, patch_shape=sh)
             img = tile_images(patches, sh, output_shape=out_shape, show=True)
@@ -141,9 +151,15 @@ def main(cmd, args):
             print("saving {}...".format(fn))
             img.save(fn)
 
+    elif cmd == "alfw":
+        print(load_alfw())
+
+    else:
+        print("unexpected cmd")
+
 
 if __name__ == "__main__":
     argv = sys.argv[1:]
-    cmd = argv[0] if len(argv) > 0 else "show"
+    cmd = argv[0] if len(argv) > 0 else "sweep"
     args = [] if len(argv) < 2 else argv[1:]
     main(cmd, args)

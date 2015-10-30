@@ -1,9 +1,6 @@
 
 import timeit
-import theano
-import theano.tensor as T
 from theano.tensor.shared_randomstreams import RandomStreams
-import numpy as np
 
 from nn import *
 
@@ -62,7 +59,6 @@ class DenoisingAutoencoder(object):
         tilde_x = self.get_corrupted_input(self.x, corruption_rate)
         y = self.get_hidden_values(tilde_x)
         z = self.get_reconstructed_input(y)
-        #l = square_error(self.x, z)
         l = cross_entropy(self.x, z)
         cost = T.mean(l)
         grads = T.grad(cost, self.params)
