@@ -1,5 +1,8 @@
 
 import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+
 import itertools
 from PIL import Image
 import theano
@@ -118,3 +121,30 @@ def scale_interval(nda, min_val=0, max_val=1, eps=1e-8):
     x_max, x_min = x.max(), x.min()
     return (1.0 * (x - x_min) * (max_val - min_val) / (x_max - x_min + eps)) + min_val
 
+
+def reconstruct(ae, data, shape, num=10):
+    """
+    Reconstruct num samples from data using the trained autoencoder ae
+    :param ae: autoencoder trained on the images
+    :param data: 2d matrix to use for reconstruction with image vectors in rows
+    :param shape: The shape of the image vector
+    :param num: number of sample to reconstruct
+    :return: idk yet
+    """
+    if num:
+        print("reconstructing {} images...".format(num))
+
+    plt.gray()
+    gs = gridspec.GridSpec(num, 2)
+    gs.update(wspace=0.1, hspace=0.1)
+    for n, i in enumerate(np.random.choice(range(data.shape[0]), size=num, replace=False)):
+        j = n*2
+        img_vec = data[i,:]
+        rec_vec = ae.reconstruct(img_vec)
+        a1 = plt.subplot(gs[j])
+        a1.axis('off')
+        a1.imshow(img_vec.reshape(shape))
+        a2 = plt.subplot(gs[j+1])
+        a2.imshow(rec_vec.reshape(shape))
+        a2.axis('off')
+    plt.show()

@@ -20,6 +20,8 @@ lfw_pattern = os.path.join(cnf.data_root, "lfw/*/*.jpg")
 lfwc_pattern = os.path.join(cnf.data_root, "lfwcrop_grey/*/*.pgm")
 alfw_db_file = os.path.join(cnf.data_root, "aflw/aflw/data/aflw.sqlite")
 
+lfwc_count = 13232
+
 
 def load_lfw(pattern=lfw_pattern, shuffle=True, limit=-1):
     """load lfw data into 3d ndarray of shape [m, patch_rows, patch_cols]"""
@@ -28,7 +30,8 @@ def load_lfw(pattern=lfw_pattern, shuffle=True, limit=-1):
 
 
 def load_lfwc(pattern=lfwc_pattern, shuffle=True, limit=-1):
-    """load lfwc data into 3d ndarray of shape [m, patch_rows, patch_cols]"""
+    """load lfwc data into 3d ndarray of shape [m, patch_rows, patch_cols]
+    This set contains 13232 images"""
     print("Loading lfwc data from {}...".format(pattern))
     return load_matrix_3d(lfwc_paths(pattern, shuffle=shuffle, limit=limit))
 

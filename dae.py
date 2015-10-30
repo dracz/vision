@@ -62,11 +62,13 @@ class DenoisingAutoencoder(object):
         l = cross_entropy(self.x, z)
         cost = T.mean(l)
         grads = T.grad(cost, self.params)
-
         updates = [
             (param, param - learning_rate * grad) for param, grad in zip(self.params, grads)
             ]
         return cost, updates
+
+    def reconstruct(self, x):
+        return self.get_reconstructed_input(self.get_hidden_values(x)).eval()
 
     def train(self, data, batch_size=20, corruption_rate=0.3,
               learning_rate=0.1, n_epochs=15, stop_diff=None):
